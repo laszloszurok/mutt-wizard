@@ -22,7 +22,7 @@ pgrep -x mbsync >/dev/null && { echo "mbsync is already running." ; exit ;}
 # will work on the maximum number of machines.
 eval "$(grep -h -- \
 	"^\s*\(export \)\?\(MBSYNCRC\|PASSWORD_STORE_DIR\|NOTMUCH_CONFIG\|GNUPGHOME\)=" \
-	"$HOME/.profile" "$HOME/.bash_profile" "$HOME/.zprofile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.pam_environment" 2>/dev/null)"
+	"$HOME/.profile" "$HOME/.bash_profile" "$HOME/.zprofile" "$HOME/.config/zsh/.zprofile" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.pam_environment" 2>/dev/null)"
 # One alternative to this kind of command would be marking the script for
 # /bin/sh -l. That might cause other problems on other particular setups that
 # do more complicated things on login, or those people who assign environmental
@@ -41,17 +41,13 @@ muttconfig="${XDG_CONFIG_HOME:-$HOME/.config}/mutt"
 case "$(uname)" in
 	Darwin)
 		notify() { osascript -e "display notification \"$2 in $1\" with title \"You've got Mail\" subtitle \"Account: $account\"" && sleep 2 ;}
-		messageinfo() { osascript -e "display notification with title \"📧 $from\" subtitle \"$subject\"" ;}
 		;;
 	*)
 		displays="$(pgrep -a Xorg | grep -wo "[0-9]*:[0-9]\+")"
 	    	notify() { for x in $displays; do
 				export DISPLAY=$x
-				notify-send --app-name="mutt-wizard" "mutt-wizard" "📬 $2 new mail(s) in \`$1\` account."
-			done ;}
-		messageinfo() { for x in $displays; do
-				export DISPLAY=$x
-				notify-send --app-name="mutt-wizard" "📧$from:" "$subject"
+				notify-send --app-name="mutt-wizard" "New Mail" "$2 new mail(s) for $1."
+                pkill -RTMIN+11 dwmblocks
 			done ;}
 		;;
 esac
@@ -63,12 +59,11 @@ syncandnotify() {
     new=$(find "$HOME/.local/share/mail/$acc/INBOX/new/" "$HOME/.local/share/mail/$acc/Inbox/new/" "$HOME/.local/share/mail/$acc/inbox/new/" -type f -newer "$muttconfig/.mailsynclastrun" 2> /dev/null)
     newcount=$(echo "$new" | sed '/^\s*$/d' | wc -l)
     if [ "$newcount" -gt "0" ]; then
-	notify "$acc" "$newcount" &
+	    notify "$acc" "$newcount" &
         for file in $new; do
             # Extract subject and sender from mail.
             from=$(awk '/^From: / && ++n ==1,/^\<.*\>:/' "$file" | perl -CS -MEncode -ne 'print decode("MIME-Header", $_)' | awk '{ $1=""; if (NF>=3)$NF=""; print $0 }' | sed 's/^[[:blank:]]*[\"'\''\<]*//;s/[\"'\''\>]*[[:blank:]]*$//')
             subject=$(awk '/^Subject: / && ++n == 1,/^\<.*\>: / && ++i == 2' "$file" | head -n 1 | perl -CS -MEncode -ne 'print decode("MIME-Header", $_)' | sed 's/^Subject: //' | sed 's/^{[[:blank:]]*[\"'\''\<]*//;s/[\"'\''\>]*[[:blank:]]*$//' | tr -d '\n')
-	    messageinfo &
         done
     fi
 }
